@@ -1,7 +1,7 @@
 # qrng
 #### Quantum Random Number Generator in JavaScript using ANU
 
-Simple interface to ANU's quantum random number generator API writting in pure JavaScript.
+Simple interface to ANU's quantum random number generator API written in pure JavaScript.
 
 ### Usage
 
