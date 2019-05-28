@@ -1,10 +1,5 @@
 class QRNG
-{
-	_cache;
-	_cacheSize;
-	_lock;
-	_isReady;
-		
+{	
 	constructor(cacheSize)
 	{
 		this._cache = [];
@@ -129,12 +124,7 @@ class QRNG
 			{
 				let range = max - min;
 				num = num % range;
-				num = min + num;			return num.substring(0, length);
-							return num.substring(0, length);
-							return num.substring(0, length);
-							return num.substring(0, length);
-							return num.substring(0, length);
-				
+				num = min + num;
 			}
 		}
 
