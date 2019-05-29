@@ -5,11 +5,17 @@ Simple interface to ANU's quantum random number generator API written in pure Ja
 
 ### Usage
 
+Create a QRNG object for specific quantum random functions
 ```
 q = new QRNG();
 q.getInteger();
 q.getFloat()
 q.getHexadecimal()
+```
+
+Replace Math.random with QRNG.getFloat and add quantum randomness to every single random event on the page
+```
+QRNG.replaceMath();
 ```
 
 ### Methods
