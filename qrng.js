@@ -1,5 +1,5 @@
 class QRNG
-{	
+{
 	constructor(cacheSize)
 	{
 		this._cache = [];
@@ -13,6 +13,7 @@ class QRNG
 			this._cacheSize = 100;
 		}
 		this._isReady = false;
+		this.onCacheEmpty(); // Run this on the onset since our cache is...empty
 		this._fillCache(this._cacheSize);
 	}
 
@@ -41,7 +42,6 @@ class QRNG
 		xhr.open("GET", url, !wait);
 		xhr.onload = function(e)
 		{
-			console.log(xhr.responseText);
 			let response = JSON.parse(xhr.responseText);
 
 			// Check that ANU validated our query
@@ -78,12 +78,14 @@ class QRNG
 			}
 		}
 		
-		console.log("Requesting URL", url);
+		console.log("QRNG: Requesting URL", url);
 		self._lock = true;
 		xhr.send();
 	}
 
 	onReady() { }
+
+	onCacheEmpty() { }
 
 	onUpdateCache(f) { }
 
@@ -99,16 +101,25 @@ class QRNG
 		// If we have less than 0 numbers in the cache, wait for a refill
 		if (this._cache.length <= 0)
 		{
-			console.log("waiting");
 			this._fillCache(this._cacheSize, true, blocks);
 		}
-		// If we have less than 30% of our cache, refill in the background
+		
+		// If we have less than 25% of our cache, refill in the background
 		else if (this._cache.length < this._cacheMinimum)
 		{
 			this._fillCache(this._cacheSize, false, blocks);
 		}
 
-		return this._cache.pop();
+		var num = this._cache.pop();
+		
+		// Check to see if we got the last number in the cache
+		if (this._cache.length == 0)
+		{
+			this.onCacheEmpty();
+			this._isReady = false;
+		}
+
+		return num;
 	}
 
 	_getNumberOfDigits(num)
@@ -129,6 +140,11 @@ class QRNG
 		}
 
 		return num;
+	}
+
+	isReady()
+	{
+		return this._isReady;
 	}
 
 	getInteger(min, max)
@@ -160,5 +176,13 @@ class QRNG
 		let digits = this._getNumberOfDigits(num);
 
 		return num / (10 ** digits);
+	}
+
+	static replaceMath()
+	{
+		var generator = new QRNG(1024);
+		Math.random = function() {
+			return generator.getFloat();
+		}
 	}
 }
