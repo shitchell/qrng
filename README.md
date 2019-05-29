@@ -39,7 +39,7 @@ onUpdateFailed(f)
 * Run f(err, xhr) if an update fails. "err" is the error object from the XMLHttpRequest, and xhr is the... XMLHttpRequest
 
 replaceMath()
-* Static method. QRNG.replaceMath() creates a new QRNG object with a cache of 1024 (the maximum allowed by ANU). It then replaces Math.random with the QRNG.getFloat(). All subsequent calls to Math.random() will thus be based on quantum randomness (read: every single random event on the page, even those having nothing to do with qrng.js, will become quantumizedified).
+* Static method. QRNG.replaceMath() creates a new QRNG object with a cache of 1024 (the maximum allowed by ANU). It then replaces Math.random with QRNG.getFloat(). All subsequent calls to Math.random() will thus be based on quantum randomness (read: every single random event on the page, even those having nothing to do with qrng.js, will become quantumizedified).
 
 ### Notes
 
