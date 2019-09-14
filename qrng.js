@@ -9,7 +9,7 @@ class QRNG
 		this._cache = localStorage._qrng_cache;
 		this._lock = false;
 		if (typeof cacheSize === "number")
-		{c
+		{
 			this._cacheSize = Math.floor(cacheSize);
 		}
 		else
