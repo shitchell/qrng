@@ -2,10 +2,14 @@ class QRNG
 {
 	constructor(cacheSize)
 	{
-		this._cache = "";
+		if (localStorage._qrng_cache === undefined)
+		{
+			localStorage._qrng_cache = "";
+		}
+		this._cache = localStorage._qrng_cache;
 		this._lock = false;
 		if (typeof cacheSize === "number")
-		{
+		{c
 			this._cacheSize = Math.floor(cacheSize);
 		}
 		else
