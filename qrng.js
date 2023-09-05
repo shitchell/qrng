@@ -6,7 +6,6 @@ class QRNG
 		{
 			localStorage._qrng_cache = "";
 		}
-		this._cache = localStorage._qrng_cache;
 		this._lock = false;
 		if (typeof cacheSize === "number")
 		{
@@ -54,7 +53,7 @@ class QRNG
 			console.log("filling cache with:", data)
 			
 			// Append the new values to the cache
-			self._cache += data.join("");
+			localStorage._qrng_cache += data.join("");
 
 			// Ready stuffs
 			if (!self.isReady())
@@ -143,15 +142,15 @@ class QRNG
 
 	_cachePop(length)
 	{
-		var substr = this._cache.substring(0, length);
-		this._cache = this._cache.substring(length);
+		var substr = localStorage._qrng_cache.substring(0, length);
+		localStorage._qrng_cache = localStorage._qrng_cache.substring(length);
 		return substr;
 	}
 	
 	_getRandom(rangeSize)
 	{
 		// If we have less than 25% of our cache, refill in the background
-		if (this._cache.length < this._cacheMinimum)
+		if (localStorage._qrng_cache.length < this._cacheMinimum)
 		{
 			this._fillCache();
 		}
@@ -165,7 +164,7 @@ class QRNG
 		var num = this._cachePop(hexLength);
 		
 		// Check to see if we got the last number in the cache
-		if (this._cache.length == 0)
+		if (localStorage._qrng_cache.length == 0)
 		{
 			this.onCacheEmpty();
 			this._isReady = false;
