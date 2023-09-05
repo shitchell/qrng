@@ -5,9 +5,6 @@ class QRNG
 		// Determine if we can use localStorage
 		this._usingLocalStorage = this._isLocalStorageEnabled();
 
-		// Start in a non-ready state
-		this._isReady = false;
-
 		// Set the cache size
 		if (typeof cacheSize === "number")
 		{
@@ -18,7 +15,10 @@ class QRNG
 
 		// Check if our cache needs to be filled
 		if (this._cache.length < this._cacheMinimum) {
+			this._isReady = false;
 			this._fillCache();
+		} else {
+			this._isReady = true;
 		}
 	}
 
