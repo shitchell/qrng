@@ -46,7 +46,7 @@ class QRNG
 			let response = JSON.parse(xhr.responseText);
 
 			// Check that ANU validated our query
-			if (!response.success)
+			if (!response.status === "success")
 			{
 				throw "Invalid query";
 			}
