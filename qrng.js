@@ -18,7 +18,19 @@ class QRNG
 
 		// Check if our cache needs to be filled
 		if (this._cache.length < this._cacheMinimum) {
-			await this._fillCache();
+			this._fillCache();
+		}
+	}
+
+	_debug() {
+		if (QRNG._DEBUG) {
+			// prepend the arguments with a timestamp and label
+			const timestamp = new Date().toISOString().replace("T", " ").replace(/\..*/, "");
+			const args = Array.prototype.slice.call(arguments);
+			args.unshift(`[qrng.js] ${timestamp}}`);
+
+			// call console.log with the new args
+			console.log.apply(null, args);
 		}
 	}
 
@@ -43,11 +55,12 @@ class QRNG
 		} else {
 			cache = this.__cache;
 		}
-		console.log(`[qrng.js] getting cache (using localStorage = {this._usingLocalStorage}))`, cache);
+		this._debug(`getting cache (localStorage = {this._usingLocalStorage}))`, cache);
 		return cache || "";
 	}
 	set _cache(value) {
-		console.log(`[qrng.js] setting cache (using localStorage = {this._usingLocalStorage}))`, cache, "=", value);
+		let cache = this._usingLocalStorage ? localStorage._qrng_cache : this.__cache;
+		this._debug(`setting cache (localStorage = {this._usingLocalStorage}))`, cache, "=", value);
 		if (this._usingLocalStorage) {
 			localStorage._qrng_cache = value;
 		} else {
@@ -55,43 +68,66 @@ class QRNG
 		}
 	}
 
-	async _fillCache()
+	_fillCache()
 	{
-		// Calculate how big of a request we need to make
-		let size = this._calculateBlockSize();		
-		let length = size['size'];
-		let blocks = size['blocks'];
+		var self = this;
 
-		// Request some quantum randomness
+		if (self._lock)
+		{
+			return;
+		}
+		else
+		{
+			self._lock = true;
+		}
+
+		var size = this._calculateBlockSize();
+		var length = size['size'];
+		var blocks = size['blocks'];
+
 		let url = `https://api.shitchell.com/qrng?length=${length}&type=hex16&size=${blocks}`;
-		let response = await fetch(url);
-
-		// Check if the response thinks it's valid
-		if (!response.status === "success")
+		let xhr = new XMLHttpRequest();
+		xhr.open("GET", url);
+		xhr.onload = function(e)
 		{
-			this.onUpdateFailed();
-			throw "Invalid query";
+			let response = JSON.parse(xhr.responseText);
+
+			// Check that ANU validated our query
+			if (!response.status === "success")
+			{
+				throw "Invalid query";
+			}
+			let data = response.payload.data;
+			self._debug("filling cache with:", data)
+
+			// Append the new values to the cache
+			self._cache += data.join("");
+
+			// Ready stuffs
+			if (!self.isReady())
+			{
+				self._isReady = true;
+				self.onReady();
+			}
+			self.onUpdateCache();
 		}
-		
-		// Check if the data is valid
-		let data = response.payload.data;
-		if (!data || data.length <= 0)
+		xhr.onreadystatechange = function(e)
 		{
-			throw "No quantum data retrieved";
+			self._lock = false;
+		}
+		xhr.onerror = function(e)
+		{
+			self._lock = false;
+			self.onUpdateFailed(e, xhr);
+		}
+		xhr.timeout = function(e)
+		{
+			self._lock = false;
+			self.onUpdateFailed(e, xhr);
 		}
 
-		// Update the cache
-		console.log("[qrng.js] filling cache with:", data)
-		self._cache += data.join("");
-
-		// Run the onUpdateCache() event now that the cache has been updated
-		this.onUpdateCache();
-
-		// If we were previously not ready, now we are, so run that event, too
-		if (!this._isReady) {
-			this._isReady = true;
-			this.onReady();
-		}
+		this._debug("requesting URL", url);
+		xhr.send();
 	}
 
 	onReady() { }
@@ -101,7 +137,7 @@ class QRNG
 	onUpdateCache() { }
 
 	onUpdateFailed(e, xhr) {
-		console.log("QRNG: Cache update failed.", e);
+		this._debug("cache update failed:", e);
 	}
 
 	get _cacheMinimum()
@@ -159,9 +195,8 @@ class QRNG
 		this._cache = this._cache.substring(length);
 		return substr;
 	}
-	
-	_getRandom(rangeSize)
-	{
+
+	_verifyCache(rangeSize) {
 		if (typeof rangeSize !== "number")
 		{
 			rangeSize = 256;
@@ -171,17 +206,26 @@ class QRNG
 
 		// Add to the cache if we are below our minimum limit or if we don't have enough
 		// to grab the requested range size
-		while (this._cache.length < hexLength || this._cache.length < this._cacheMinimum)
+		if (this._cache.length < hexLength || this._cache.length < this._cacheMinimum)
 		{
-			await this._fillCache();
+			this._fillCache();
 		}
+	}
+
+	_getRandom(rangeSize)
+	{
+		// Verify that we have enough in the cache to satisfy the range size
+		this._verifyCache(rangeSize);
+		var hexLength = this._rangeToHexLength(rangeSize);
+
 		var num = this._cachePop(hexLength);
-		
+
 		// Check to see if we got the last number in the cache
 		if (this._cache.length == 0)
 		{
 			this.onCacheEmpty();
 			this._isReady = false;
+			this._fillCache();
 		}
 
 		return num;
@@ -241,6 +285,9 @@ class QRNG
 
 	getHexadecimal(length)
 	{
+		// Verify that we have enough in the cache to satisfy the range size
+		this._verifyCache(rangeSize);
+
 		if (typeof length !== "number")
 		{
 			length = 6;
@@ -252,7 +299,7 @@ class QRNG
 	// Returns a number between 0 and 1 between 0x00000 and 0xFFFFF
 	getFloat()
 	{
-		let num = this.getHexadecimal(5);
+		let num = this._getRandom(0xFFFFF);
 		num = parseInt(num, 16);
 		let digits = this._getNumberOfDigits(num);
 
@@ -271,3 +318,4 @@ class QRNG
 
 QRNG.MAX_BLOCK_SIZE = 10;
 QRNG.MAX_ARRAY_SIZE = 1024;
+QRNG._DEBUG = false;
