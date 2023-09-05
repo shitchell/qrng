@@ -50,7 +50,8 @@ class QRNG
 			{
 				throw "Invalid query";
 			}
-			let data = response.data;
+			let data = response.payload.data;
+			console.log("filling cache with:", data)
 			
 			// Append the new values to the cache
 			self._cache += data.join("");
