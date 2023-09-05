@@ -5,9 +5,10 @@ class QRNG
 		// Determine if we can use localStorage
 		this._usingLocalStorage = this._isLocalStorageEnabled();
 
-		// Set some default state tracking stuffs
-		this._lock = false;
+		// Start in a non-ready state
 		this._isReady = false;
+
+		// Set the cache size
 		if (typeof cacheSize === "number")
 		{
 			this._cacheSize = Math.floor(cacheSize);
@@ -42,9 +43,11 @@ class QRNG
 		} else {
 			cache = this.__cache;
 		}
+		console.log(`[qrng.js] getting cache (using localStorage = {this._usingLocalStorage}))`, cache);
 		return cache || "";
 	}
 	set _cache(value) {
+		console.log(`[qrng.js] setting cache (using localStorage = {this._usingLocalStorage}))`, cache, "=", value);
 		if (this._usingLocalStorage) {
 			localStorage._qrng_cache = value;
 		} else {
@@ -54,64 +57,41 @@ class QRNG
 
 	_fillCache()
 	{
-		var self = this;
+		// Calculate how big of a request we need to make
+		let size = this._calculateBlockSize();		
+		let length = size['size'];
+		let blocks = size['blocks'];
 
-		if (self._lock)
-		{
-			return;
-		}
-		else
-		{
-			self._lock = true;
-		}
-
-		var size = this._calculateBlockSize();		
-		var length = size['size'];
-		var blocks = size['blocks'];
-		
+		// Request some quantum randomness
 		let url = `https://api.shitchell.com/qrng?length=${length}&type=hex16&size=${blocks}`;
-		let xhr = new XMLHttpRequest();
-		xhr.open("GET", url);
-		xhr.onload = function(e)
-		{
-			let response = JSON.parse(xhr.responseText);
+		let response = await fetch(url);
 
-			// Check that ANU validated our query
-			if (!response.status === "success")
-			{
-				throw "Invalid query";
-			}
-			let data = response.payload.data;
-			console.log("filling cache with:", data)
-			
-			// Append the new values to the cache
-			self._cache += data.join("");
-
-			// Ready stuffs
-			if (!self.isReady())
-			{
-				self._isReady = true;
-				self.onReady();
-			}
-			self.onUpdateCache();
-		}
-		xhr.onreadystatechange = function(e)
+		// Check if the response thinks it's valid
+		if (!response.status === "success")
 		{
-			self._lock = false;
-		}
-		xhr.onerror = function(e)
-		{
-			self._lock = false;
-			self.onUpdateFailed(e, xhr);
-		}
-		xhr.timeout = function(e)
-		{
-			self._lock = false;
-			self.onUpdateFailed(e, xhr);
+			this.onUpdateFailed();
+			throw "Invalid query";
 		}
 		
-		console.log("QRNG: Requesting URL", url);
-		xhr.send();
+		// Check if the data is valid
+		let data = response.payload.data;
+		if (!data || data.length <= 0)
+		{
+			throw "No quantum data retrieved";
+		}
+
+		// Update the cache
+		console.log("[qrng.js] filling cache with:", data)
+		self._cache += data.join("");
+
+		// Run the onUpdateCache() event now that the cache has been updated
+		this.onUpdateCache();
+
+		// If we were previously not ready, now we are, so run that event, too
+		if (!this._isReady) {
+			this._isReady = true;
+			this.onReady();
+		}
 	}
 
 	onReady() { }
