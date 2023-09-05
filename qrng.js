@@ -18,7 +18,7 @@ class QRNG
 
 		// Check if our cache needs to be filled
 		if (this._cache.length < this._cacheMinimum) {
-			this._fillCache();
+			await this._fillCache();
 		}
 	}
 
@@ -55,7 +55,7 @@ class QRNG
 		}
 	}
 
-	_fillCache()
+	async _fillCache()
 	{
 		// Calculate how big of a request we need to make
 		let size = this._calculateBlockSize();		
@@ -173,7 +173,7 @@ class QRNG
 		// to grab the requested range size
 		while (this._cache.length < hexLength || this._cache.length < this._cacheMinimum)
 		{
-			this._fillCache();
+			await this._fillCache();
 		}
 		var num = this._cachePop(hexLength);
 		
