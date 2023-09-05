@@ -2,27 +2,53 @@ class QRNG
 {
 	constructor(cacheSize)
 	{
-		// Set the localStorage cache if unset
-		if (localStorage._qrng_cache === undefined)
-		{
-			localStorage._qrng_cache = "";
-		}
+		// Determine if we can use localStorage
+		this._usingLocalStorage = this._isLocalStorageEnabled();
 
-		// Attempt to load the localStorage cache into our class cache
-		this._cache = localStorage._qrng_cache || "";
-		
+		// Set some default state tracking stuffs
 		this._lock = false;
+		this._isReady = false;
 		if (typeof cacheSize === "number")
 		{
 			this._cacheSize = Math.floor(cacheSize);
 		} else {
 			this._cacheSize = 1000;
 		}
-		this._isReady = false;
 
 		// Check if our cache needs to be filled
 		if (this._cache.length < this._cacheMinimum) {
 			this._fillCache();
+		}
+	}
+
+	_isLocalStorageEnabled()
+	{
+		try {
+			const key = `__storage__test`;
+			window.localStorage.setItem(key, null);
+			window.localStorage.removeItem(key);
+			return true;
+		} catch (e) {
+			return false;
+		}
+	}
+
+	// A "smart" cache which uses either an instance attribute or localStorage depending on
+	// localStorage's availability
+	get _cache() {
+		let cache = "";
+		if (this._usingLocalStorage) {
+			cache = localStorage._qrng_cache;
+		} else {
+			cache = this.__cache;
+		}
+		return cache || "";
+	}
+	set _cache(value) {
+		if (this._usingLocalStorage) {
+			localStorage._qrng_cache = value;
+		} else {
+			this.__cache = value;
 		}
 	}
 
@@ -60,7 +86,6 @@ class QRNG
 			
 			// Append the new values to the cache
 			self._cache += data.join("");
-			localStorage._qrng_cache = self._cache;
 
 			// Ready stuffs
 			if (!self.isReady())
@@ -149,26 +174,27 @@ class QRNG
 
 	_cachePop(length)
 	{
+		// Check if we can use the localStorage cache first
 		var substr = this._cache.substring(0, length);
 		this._cache = this._cache.substring(length);
-		localStorage._qrng_cache = this._cache;
 		return substr;
 	}
 	
 	_getRandom(rangeSize)
 	{
-		// If we have less than 25% of our cache, refill in the background
-		if (this._cache.length < this._cacheMinimum)
-		{
-			this._fillCache();
-		}
-
 		if (typeof rangeSize !== "number")
 		{
 			rangeSize = 256;
 		}
 
 		var hexLength = this._rangeToHexLength(rangeSize);
+
+		// Add to the cache if we are below our minimum limit or if we don't have enough
+		// to grab the requested range size
+		while (this._cache.length < hexLength || this._cache.length < this._cacheMinimum)
+		{
+			this._fillCache();
+		}
 		var num = this._cachePop(hexLength);
 		
 		// Check to see if we got the last number in the cache
