@@ -131,7 +131,7 @@ class QRNG
 			blockSize = QRNG.MAX_BLOCK_SIZE;
 		}
 
-		return {size: blockSize, blocks: Math.floor(arraySize)};
+		return {blocks: blockSize, size: Math.floor(arraySize)};
 	}
 
 	// Return the minimum number of hex characters required to satisfy a given range
