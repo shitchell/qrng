@@ -27,7 +27,7 @@ class QRNG
 			// prepend the arguments with a timestamp and label
 			const timestamp = new Date().toISOString().replace("T", " ").replace(/\..*/, "");
 			const args = Array.prototype.slice.call(arguments);
-			args.unshift(`[qrng.js] ${timestamp}}`);
+			args.unshift(`[qrng.js] ${timestamp} --`);
 
 			// call console.log with the new args
 			console.log.apply(null, args);
@@ -55,12 +55,12 @@ class QRNG
 		} else {
 			cache = this.__cache;
 		}
-		this._debug(`getting cache (localStorage = {this._usingLocalStorage}))`, cache);
+		this._debug(`getting cache (localStorage = ${this._usingLocalStorage})`, cache);
 		return cache || "";
 	}
 	set _cache(value) {
 		let cache = this._usingLocalStorage ? localStorage._qrng_cache : this.__cache;
-		this._debug(`setting cache (localStorage = {this._usingLocalStorage}))`, cache, "=", value);
+		this._debug(`setting cache (localStorage = ${this._usingLocalStorage}))`, cache, "=", value);
 		if (this._usingLocalStorage) {
 			localStorage._qrng_cache = value;
 		} else {
@@ -196,17 +196,15 @@ class QRNG
 		return substr;
 	}
 
-	_verifyCache(rangeSize) {
-		if (typeof rangeSize !== "number")
+	_verifyCache(length) {
+		if (typeof length !== "number")
 		{
-			rangeSize = 256;
+			length = 16;
 		}
-
-		var hexLength = this._rangeToHexLength(rangeSize);
 
 		// Add to the cache if we are below our minimum limit or if we don't have enough
 		// to grab the requested range size
-		if (this._cache.length < hexLength || this._cache.length < this._cacheMinimum)
+		if (this._cache.length < length || this._cache.length < this._cacheMinimum)
 		{
 			this._fillCache();
 		}
@@ -215,8 +213,8 @@ class QRNG
 	_getRandom(rangeSize)
 	{
 		// Verify that we have enough in the cache to satisfy the range size
-		this._verifyCache(rangeSize);
 		var hexLength = this._rangeToHexLength(rangeSize);
+		this._verifyCache(hexLength);
 
 		var num = this._cachePop(hexLength);
 
@@ -286,7 +284,7 @@ class QRNG
 	getHexadecimal(length)
 	{
 		// Verify that we have enough in the cache to satisfy the range size
-		this._verifyCache(rangeSize);
+		this._verifyCache(length);
 
 		if (typeof length !== "number")
 		{
@@ -299,7 +297,9 @@ class QRNG
 	// Returns a number between 0 and 1 between 0x00000 and 0xFFFFF
 	getFloat()
 	{
-		let num = this._getRandom(0xFFFFF);
+		// Javascript uses 64-bit floats, so we will grab a 64-bit number and
+		// divide it by the maximum 64-bit number
+		let num = this._getRandom(0xFFFFFFFFFFFFFFFF);
 		num = parseInt(num, 16);
 		let digits = this._getNumberOfDigits(num);
 
