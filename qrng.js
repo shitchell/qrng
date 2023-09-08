@@ -1,3 +1,11 @@
+/*
+ * QRNG.js
+ * A simple quantum random number generator
+ * 
+ * Author: shitchell
+ * License: wtfpl
+ */
+
 class QRNG
 {
 	constructor(cacheSize)
@@ -37,7 +45,7 @@ class QRNG
 	_isLocalStorageEnabled()
 	{
 		try {
-			const key = `__storage__test`;
+			const key = "__storage__test";
 			window.localStorage.setItem(key, null);
 			window.localStorage.removeItem(key);
 			return true;
@@ -49,7 +57,7 @@ class QRNG
 	// A "smart" cache which uses either an instance attribute or localStorage depending on
 	// localStorage's availability
 	get _cache() {
-		let cache = "";
+		let cache;
 		if (this._usingLocalStorage) {
 			cache = localStorage._qrng_cache;
 		} else {
@@ -70,7 +78,7 @@ class QRNG
 
 	_fillCache()
 	{
-		var self = this;
+		const self = this;
 
 		if (self._lock)
 		{
@@ -210,13 +218,38 @@ class QRNG
 		}
 	}
 
+	static _isBase16Compatible(rangeSize) {
+		switch (rangeSize) {
+			case 1:
+			case 2:
+			case 4:
+			case 8:
+			    // for these numbers, just return true (they divide evenly into 16)
+				return true;
+			default:
+				// for all other numbers, return whether % 16 is 0
+				return rangeSize % 16 == 0;
+		}
+	}
+
+	// TODO: Fix this to work uniformly with a range not divisible by 16
 	_getRandom(rangeSize)
 	{
+		// If rangeSize is 1, we can just return 0
+		if (rangeSize == 1) {
+			return 0;
+		}
+
+		// Check if the range is a power of 16
+		if (!QRNG._isBase16Compatible(rangeSize)) {
+			console.warn(`QRNG: rangeSize (${rangeSize}) is not a power of 16! This will cause bias towards lower numbers pending a fix.`);
+		}
+
 		// Verify that we have enough in the cache to satisfy the range size
 		var hexLength = this._rangeToHexLength(rangeSize);
 		this._verifyCache(hexLength);
 
-		var num = this._cachePop(hexLength);
+		var num = this._cachePop(hexLength + 1);
 
 		// Check to see if we got the last number in the cache
 		if (this._cache.length == 0)
@@ -234,6 +267,7 @@ class QRNG
 		return Math.floor(Math.log10(num)) + 1;
 	}
 	
+	// Accepts a number and returns it within the range of min and max
 	_numToRange(min, max, num)
 	{
 		if (typeof min !== "undefined" && typeof max !== "undefined")
@@ -306,13 +340,71 @@ class QRNG
 		return num / (10 ** digits);
 	}
 
+	// Returns the average of multiple calls to getInteger()
+	getAverageInteger(min, max, iterations)
+	{
+		if (typeof iterations !== "number")
+		{
+			iterations = 10;
+		}
+
+		let total = 0;
+		for (let i = 0; i < iterations; i++)
+		{
+			total += this.getInteger(min, max);
+		}
+
+		return Math.round(total / iterations);
+	}
+
+	// Returns the average of multiple calls to getFloat()
+	getAverageFloat(iterations)
+	{
+		if (typeof iterations !== "number")
+		{
+			iterations = 10;
+		}
+
+		let total = 0;
+		for (let i = 0; i < iterations; i++)
+		{
+			total += this.getFloat();
+		}
+
+		return total / iterations;
+	}
+
+	// Returns a random selection from an array
+	getChoice(arr)
+	{
+		let index = this.getInteger(0, arr.length);
+		return arr[index];
+	}
+
+	// Returns a random boolean
+	getBoolean()
+	{
+		return this.getInteger(0, 2) == 1;
+	}
+
+	// Randomize / shuffle the elements of an array
+	shuffle(arr)
+	{
+		let newArr = [];
+		while (arr.length > 0)
+		{
+			let index = this.getInteger(0, arr.length);
+			newArr.push(arr.splice(index, 1)[0]);
+		}
+
+		return newArr;
+	}
+
 	static replaceMath()
 	{
 		var generator = new QRNG(QRNG.MAX_BLOCK_SIZE * QRNG.MAX_ARRAY_SIZE * 2); // Maximum cache size
 		Math.qrng = generator;
-		Math.random = function() {
-			return generator.getFloat();
-		}
+		Math.random = function() { return Math.qrng.getFloat(); }
 	}
 }
 
