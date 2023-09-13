@@ -20,20 +20,45 @@ QRNG.replaceMath();
 
 ### Methods
 
-new QRNG(cacheSize)
-* Creates a new object (duh) with a default cacheSize of 100
-* Optionally, specify a greater cache size if you're going to be doing lots of randomness
+new QRNG(cacheSize = 2048)
+* Creates a new object with a default cache size of 2048 hexadecimal characters
+* Optionally, specify a greater cache size if you're going to be doing lots of
+  randomness
 
-getInteger(min, max)
-* By default returns an integer between 0 and 4,294,967,295 ("0xFFFFFFFF")
-* Optionally, specify a range. If no max is given, min will be ignored.
+getInteger(min = 0, max = 256)
+* Returns an integer between the specified min (inclusive) and max (exclusive)
+
+getAverageInteger(min = 0, max = 256, iterations = 10)
+* Returns the average of "iterations" number of integers between the specified
+  min (inclusive) and max (exclusive)
 
 getFloat()
-* Returns a float between 0 and 1
+* Returns a 64-bit (0xFFFFFFFFFFFFFFFF) float between 0 and 1
 
-getHexadecimal(length)
-* By default returns an 8 character hexidecimal string
-* Optionally, you can specify another length
+getAverageFloat(iterations = 10)
+* Returns the average of "iterations" number of 64-bit (0xFFFFFFFFFFFFFFFF)
+  floats between 0 and 1
+
+getHexadecimal(length = 6)
+* By default returns a 6 character hexidecimal string
+* Optionally specify a length
+
+getBoolean()
+* Returns a random boolean
+
+getChoice(array)
+* Returns a random element from the specified array
+
+getChoices(array, num = 1)
+* Returns an array of "num" random elements from the specified array
+* Duplicate elements are allowed
+
+getUniqueChoices(array, num = 1)
+* Returns an array of "num" random elements from the specified array
+* Duplicate elements are not allowed
+
+shuffle(array)
+* Returns a shuffled version of the specified array
 
 onReady(f)
 * Run f() after the first successful cache update
@@ -42,28 +67,49 @@ onCacheUpdate(f)
 * Run f() each time the cache updates (including the first)
 
 onUpdateFailed(f)
-* Run f(err, xhr) if an update fails. "err" is the error object from the XMLHttpRequest, and xhr is the... XMLHttpRequest
+* Run f(err, xhr) if an update fails. "err" is the error object from the
+  XMLHttpRequest, and xhr is the... XMLHttpRequest
 
-replaceMath()
-* Static method. QRNG.replaceMath() creates a new QRNG object with a cache of 1024 (the maximum allowed by ANU). It then replaces Math.random with QRNG.getFloat(). All subsequent calls to Math.random() will thus be based on quantum randomness (read: every single random event on the page, even those having nothing to do with qrng.js, will become quantumizedified).
+static replaceMath()
+* QRNG.replaceMath() creates a new QRNG object with a cache of 1024 (the maximum
+  allowed by ANU). It then replaces Math.random with QRNG.getFloat(). All
+  subsequent calls to Math.random() will thus be based on quantum randomness
+  (read: every single random event on the page, even those having nothing to do
+  with qrng.js, will become quantumizedified).
 
 ### Notes
 
-I didn't even think this would be possible due to cross-domain policies, but apparently the guys over at ANU are awesome about sharing their data! Making an xhr request is no issue.
+ANU has updated their API to require a license. A free license grants you 100
+requests, and a $3/month paid license grants unlimited requests. You can obtain
+a license by going to their QRNG homepage: https://qrng.anu.edu.au/
 
-With that in mind, *we are making an xhr request*, and we don't want to do that every single time we want to generate a random number. So a cache is used with a default size of 100. Once it hits 50, it sends another request to the server to refill its cache in the background.
+Because ANU's API doesn't allow cross-origin requests, qrng.js currently uses a
+proxy server to get around this. At some point, I'll open source the proxy, but
+essentially it just sets up CORS headers and forwards the request to ANU. If I
+get hit by a car, and you need to set up your own proxy, you can do those
+things.
 
-When you first create a QRNG object, before you call any methods, it automatically fills its cache. However, this process will take some amount of time depending on internet connection, alignment of the stars, etc... (usually about 2 seconds for me) ~~So if you need it NOW, well... that's life.~~ So you might want to use the .onReady() function before you first use it. It gets called after the first successful cache update (and only the first).
+At present, all of the `get___()` methods expect the cache to be filled. Filling
+the cache takes ~3 seconds depending on internets and the configured cache size
+and the alignment of the stars. This means that if you call `get___()` before
+the cache is filled, nothing will hapen (I should probably at least set it up
+to throw an error). You can use the `onReady()` method to run a function once
+the cache is filled. You can also use the `onCacheUpdate()` method to run a
+function each time the cache is updated. At some point, I intend to set up the
+`get___()` functions to return promises or something, but I haven't figured out
+how I want to implement that sort of thing yet.
 
 ### TODO
 
 - [x] Format this README :p
 - [ ] Create a method for specifying a min and max range for hexadecimal numbers
-- [ ] ANU only allows 1,024 numbers be sent at a time. Implement a loop if a larger size is requested.
+- [ ] ANU only allows 1,024 numbers be sent at a time. Implement a loop if a
+      larger size is requested.
 - [ ] Add a settings constructor to allow more fine tuned control over behavior
 - [x] Add an onReady() method to be called once the cache is filled
 - [ ] Add more qrng sources
 - [ ] Add more comments
 
-Huge credit to the guys over at Australian National University! You should definitely check them out
+Huge credit to the guys over at Australian National University! You should
+definitely check them out
 https://qrng.anu.edu.au/API/api-demo.php
