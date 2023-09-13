@@ -1,7 +1,11 @@
 /*
  * QRNG.js
  * A simple quantum random number generator
- * 
+ *
+ * TODO:
+ * - Add option for weighted random choices
+ * - Ensure equal distribution
+ * - Add an option to use promises instead of callbacks
  * Author: shitchell
  * License: wtfpl
  */
@@ -18,7 +22,7 @@ class QRNG
 		{
 			this._cacheSize = Math.floor(cacheSize);
 		} else {
-			this._cacheSize = 1000;
+			this._cacheSize = 2048;
 		}
 
 		// Check if our cache needs to be filled
@@ -89,7 +93,7 @@ class QRNG
 			self._lock = true;
 		}
 
-		var size = this._calculateBlockSize();
+		var size = QRNG._calculateBlockSize(this._cacheSize);
 		var length = size['size'];
 		var blocks = size['blocks'];
 
@@ -154,14 +158,14 @@ class QRNG
 	}
 
 	// Calculate the required block size needed to get the cache size requested
-	_calculateBlockSize()
+	static _calculateBlockSize(cacheSize)
 	{
 		var blockSize = 1;
 		var arraySize;
 		
 		while (blockSize <= QRNG.MAX_BLOCK_SIZE) // Maximum block size
 		{
-			let testArraySize = this._cacheSize / (2 * blockSize);
+			let testArraySize = cacheSize / (2 * blockSize);
 
 			if (testArraySize > QRNG.MAX_ARRAY_SIZE)
 			{
@@ -169,7 +173,7 @@ class QRNG
 				continue;
 			}
 			
-			if (testArraySize * 2 * blockSize >= this._cacheSize)
+			if (testArraySize * 2 * blockSize >= cacheSize)
 			{
 				arraySize = testArraySize;
 				break;
@@ -187,6 +191,63 @@ class QRNG
 		}
 
 		return {blocks: blockSize, size: Math.floor(arraySize)};
+	}
+
+	// Internal function for analyzing an array to determine the distribution of
+	// its values
+	static _analyze(arr) {
+		// Create a map to hold the stats on each array item:
+		//   {"item 1": {count: 1, percent: 0.1}, "item 2": {count: 2, percent: 0.2}, ...}
+		let map = new Map();
+
+		// Count each item in the array
+		arr.forEach(item => {
+			if (map.has(item)) {
+				let itemData = map.get(item);
+				itemData.count++;
+				map.set(item, itemData);
+			} else {
+				map.set(item, {count: 1});
+			}
+		});
+
+		// Loop over each key in the map and calculate the percentage of the
+		// total array that the item represents
+		const mapKeys = [...map.keys()];
+		const totalKeys = mapKeys.length;
+		let maxOffset = {item: null, offset: 0};
+		let minOffset = {item: null, offset: 0};
+		let totalOffset = 0;
+		let totalAbsOffset = 0;
+		map.forEach((itemData, item) => {
+			itemData.percent = itemData.count / arr.length;
+			itemData.percentOffset = itemData.percent - (1 / totalKeys);
+			if (maxOffset.item === null || itemData.percentOffset > maxOffset.offset) {
+				maxOffset.item = item;
+				maxOffset.offset = itemData.percentOffset;
+			}
+			if (minOffset.item === null || itemData.percentOffset < minOffset.offset) {
+				minOffset.item = item;
+				minOffset.offset = itemData.percentOffset;
+			}
+			totalOffset += itemData.percentOffset;
+			totalAbsOffset += Math.abs(itemData.percentOffset);
+			map.set(item, itemData);
+		});
+
+		// Convert the item map into an object sorted by count
+		let sortedMap = new Map(
+			[...map.entries()].sort((a, b) => b[1].count - a[1].count)
+		);
+
+		return {
+			arrayItems: sortedMap,
+			maxOffset: maxOffset,
+			minOffset: minOffset,
+			avgOffset: totalOffset / totalKeys,
+			avgAbsOffset: totalAbsOffset / totalKeys,
+			totalKeys: totalKeys,
+		}
 	}
 
 	// Return the minimum number of hex characters required to satisfy a given range
@@ -242,7 +303,7 @@ class QRNG
 
 		// Check if the range is a power of 16
 		if (!QRNG._isBase16Compatible(rangeSize)) {
-			console.warn(`QRNG: rangeSize (${rangeSize}) is not a power of 16! This will cause bias towards lower numbers pending a fix.`);
+			console.warn(`QRNG: rangeSize (${rangeSize}) is not a power of 16! This might cause bias towards lower numbers (see: https://github.com/shitchell/qrng/issues/3)`);
 		}
 
 		// Verify that we have enough in the cache to satisfy the range size
@@ -328,7 +389,7 @@ class QRNG
 		return this._cachePop(length);
 	}
 
-	// Returns a number between 0 and 1 between 0x00000 and 0xFFFFF
+	// Returns a 64-bit number between 0 and 1
 	getFloat()
 	{
 		// Javascript uses 64-bit floats, so we will grab a 64-bit number and
@@ -377,8 +438,79 @@ class QRNG
 	// Returns a random selection from an array
 	getChoice(arr)
 	{
+		if (arr.length == 0)
+		{
+			return null;
+		}
+
 		let index = this.getInteger(0, arr.length);
 		return arr[index];
+	}
+
+	// Return a list of random choices from an array
+	getChoices(arr, num)
+	{
+		if (typeof num !== "number")
+		{
+			num = 1;
+		}
+
+		let newArr = [];
+		for (let i = 0; i < num; i++)
+		{
+			newArr.push(this.getChoice(arr));
+		}
+
+		return newArr;
+	}
+
+	// Return a list of random choices from an array without duplicates
+	getUniqueChoices(arr, num)
+	{
+		if (typeof num !== "number")
+		{
+			num = 1;
+		}
+
+		if (num > arr.length)
+		{
+			// If we want more choices than there are elements in the array,
+			// just return the shuffled array
+			return shuffle(arr);
+		}
+
+		let newArr = [];
+		// Track which indices we've used. We'll use a set to save on lookup
+		// times.
+		let usedIndices = new Set();
+		for (let i = 0; i < num; i++)
+		{
+			// Get a random index in the range of unused indices
+			let range = arr.length - usedIndices.size;
+			let index = this.getInteger(0, range);
+			// If the index is already used, find the next unused index
+			// e.g.: if we have the list:
+			//         ["one", "two" (used), "three" (used), "four", "five"]
+			//       and pull a random index of 1, we will want to increment
+			//       that index to 3 (i.e.: "four").
+			//       if we have the list:
+			//         ["one" (used), "two", "three", "four", "five" (used)]
+			//       and pull a random index of 4, we will want to reset the
+			//       index to 0 (i.e.: "one") and then increment it to
+			//       1 (i.e.: "two").
+			while (usedIndices.has(index))
+			{
+				++index;
+				if (index >= arr.length)
+				{
+					index = 0;
+				}
+			}
+			usedIndices.add(index);
+			newArr.push(arr[index]);
+		}
+
+		return newArr;
 	}
 
 	// Returns a random boolean
@@ -391,6 +523,7 @@ class QRNG
 	shuffle(arr)
 	{
 		let newArr = [];
+		let arrCopy = arr.slice(0);
 		while (arr.length > 0)
 		{
 			let index = this.getInteger(0, arr.length);
