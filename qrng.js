@@ -97,7 +97,7 @@ class QRNG
 		var length = size['size'];
 		var blocks = size['blocks'];
 
-		let url = `https://api.shitchell.com/quantum/random?length=${length}&type=hex16&size=${blocks}`;
+		let url = `https://api.shitchell.com/v1/quantum/random?length=${length}&type=hex16&size=${blocks}`;
 		let xhr = new XMLHttpRequest();
 		xhr.open("GET", url);
 		xhr.onload = function(e)
