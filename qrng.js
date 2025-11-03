@@ -105,11 +105,11 @@ class QRNG
 			let response = JSON.parse(xhr.responseText);
 
 			// Check that ANU validated our query
-			if (!response.status === "success")
+			if (response.success !== true)
 			{
 				throw "Invalid query";
 			}
-			let data = response.payload.data;
+			let data = response.data;
 			self._debug("filling cache with:", data)
 
 			// Append the new values to the cache
